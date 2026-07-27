@@ -1,0 +1,29 @@
+name: Aktien & Crypto Multi-Tracker
+
+on:
+  schedule:
+    # Führt das Skript alle 2 Stunden aus (00:00, 02:00, 04:00, ..., 22:00 UTC)
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Ermöglicht manuelle Testläufe per Klick auf GitHub
+
+jobs:
+  check-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance requests
+
+      - name: Tracker ausführen
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python stock_tracker.py
