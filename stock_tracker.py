@@ -1,6 +1,7 @@
 import os
 import requests
 import yfinance as yf
+from datetime import datetime, timedelta
 
 # Topic aus den GitHub Secrets auslesen
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "dein_fallback_topic")
@@ -15,23 +16,33 @@ ASSETS = {
     "Chainlink": "LINK-USD"
 }
 
-# Schwellenwert für den Anstieg in Prozent (0.1 = ab +0,1% Anstieg)
-MIN_RISE_PERCENT = 0.1
-LOOKBACK_PERIOD = "1d"  # Vergleichszeitraum (1 Tag / 24 Stunden)
-
 def check_assets():
-    print("Starte Aktien- & Crypto-Überprüfung...")
+    print("Starte 2-Stunden-Kursvergleich...")
     
     for name, symbol in ASSETS.items():
         try:
             ticker = yf.Ticker(symbol)
-            df = ticker.history(period=LOOKBACK_PERIOD)
+            # 5-Minuten-Intervall-Daten abrufen, um den Kurs von vor 2 Stunden exakt zu bestimmen
+            df = ticker.history(period="1d", interval="5m")
             
             if df.empty or len(df) < 2:
-                print(f"[{name}] Keine ausreichenden Kursdaten gefunden.")
+                print(f"[{name}] Keine ausreichenden Intraday-Daten verfügbar.")
                 continue
 
-            ref_price = df['Close'].iloc[0]
+            current_time = df.index[-1]
+            target_time = current_time - timedelta(hours=2)
+
+            # Suche den Datenpunkt, der am nächsten an 2 Stunden zurückliegt
+            df_past = df[df.index <= target_time]
+            
+            if not df_past.empty:
+                ref_price = df_past['Close'].iloc[-1]
+                time_diff_str = "letzten 2 Std."
+            else:
+                # Falls z.B. bei Börsenöffnung noch keine 2 Std. Handelszeit vergangen sind
+                ref_price = df['Close'].iloc[0]
+                time_diff_str = "Start der Handelszeit"
+
             current_price = df['Close'].iloc[-1]
             
             # Prozentuale Änderung berechnen
@@ -48,30 +59,35 @@ def check_assets():
             else:
                 currency_symbol = currency
 
-            print(f"[{name}] Aktuell: {current_price:.2f} {currency_symbol} | Änderung: {change_percent:+.2f}%")
-
-            # Nur benachrichtigen, wenn der Kurs steigt
-            if change_percent >= MIN_RISE_PERCENT:
-                title = f"🚀 {name}: +{change_percent:.2f}%"
-                message = (
-                    f"{name} steigt!\n"
-                    f"Aktueller Kurs: {current_price:.2f} {currency_symbol}\n"
-                    f"Referenzkurs ({LOOKBACK_PERIOD}): {ref_price:.2f} {currency_symbol}\n"
-                    f"Anstieg: +{change_percent:.2f}%"
-                )
-                
-                requests.post(
-                    f"https://ntfy.sh/{NTFY_TOPIC}",
-                    data=message.encode('utf-8'),
-                    headers={
-                        "Title": title,
-                        "Priority": "default",
-                        "Tags": "chart_with_upwards_trend,rocket"
-                    }
-                )
-                print(f" -> Push-Benachrichtigung gesendet für {name}")
+            # Benachrichtigungs-Details festlegen
+            if change_percent >= 0:
+                direction_icon = "🚀"
+                direction_text = "Anstieg"
+                tags = "chart_with_upwards_trend"
             else:
-                print(f" -> Kein Anstieg. Keine Benachrichtigung gesendet.")
+                direction_icon = "📉"
+                direction_text = "Rückgang"
+                tags = "chart_with_downwards_trend"
+
+            title = f"{direction_icon} {name}: {change_percent:+.2f}% (2h)"
+            message = (
+                f"{name} ({direction_text})\n"
+                f"Aktueller Kurs: {current_price:.2f} {currency_symbol}\n"
+                f"Kurs vor {time_diff_str}: {ref_price:.2f} {currency_symbol}\n"
+                f"Veränderung: {change_percent:+.2f}%"
+            )
+            
+            # Push-Nachricht senden
+            requests.post(
+                f"https://ntfy.sh/{NTFY_TOPIC}",
+                data=message.encode('utf-8'),
+                headers={
+                    "Title": title,
+                    "Priority": "default",
+                    "Tags": tags
+                }
+            )
+            print(f" -> Push-Benachrichtigung gesendet für {name} ({change_percent:+.2f}%)")
 
         except Exception as e:
             print(f"Fehler bei {name} ({symbol}): {e}")
