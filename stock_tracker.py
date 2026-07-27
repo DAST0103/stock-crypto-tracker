@@ -1,7 +1,11 @@
 import os
+import sys
 import requests
 import yfinance as yf
 from datetime import datetime, timedelta
+
+# Erzwinge UTF-8 Kodierung für die Konsole (behebt den Emoji 'latin-1' Fehler)
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Topic aus den GitHub Secrets auslesen
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "dein_fallback_topic")
@@ -22,7 +26,7 @@ def check_assets():
     for name, symbol in ASSETS.items():
         try:
             ticker = yf.Ticker(symbol)
-            # 5-Minuten-Intervall-Daten abrufen, um den Kurs von vor 2 Stunden exakt zu bestimmen
+            # 5-Minuten-Intervall-Daten abrufen
             df = ticker.history(period="1d", interval="5m")
             
             if df.empty or len(df) < 2:
@@ -39,7 +43,6 @@ def check_assets():
                 ref_price = df_past['Close'].iloc[-1]
                 time_diff_str = "letzten 2 Std."
             else:
-                # Falls z.B. bei Börsenöffnung noch keine 2 Std. Handelszeit vergangen sind
                 ref_price = df['Close'].iloc[0]
                 time_diff_str = "Start der Handelszeit"
 
