@@ -26,4 +26,5 @@ jobs:
       - name: Tracker ausführen
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PYTHONIOENCODING: utf-8
         run: python stock_tracker.py
