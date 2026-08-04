@@ -2,8 +2,11 @@ name: Check Prices
 
 on:
   schedule:
-    - cron: '0 */2 * * *'
-  workflow_dispatch:
+    # 1) Alle 2 Stunden zwischen 06:00 und 22:00 Uhr MESZ (04:00 bis 20:00 Uhr UTC)
+    - cron: '0 4,6,8,10,14,16,18,20 * * *'
+    # 2) Täglich exakt um 12:30 Uhr MESZ (10:30 Uhr UTC)
+    - cron: '30 10 * * *'
+  workflow_dispatch: # Erlaubt das manuelle Auslösen in GitHub
 
 jobs:
   check-prices:
@@ -21,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yfinance requests pandas
+          pip install yfinance requests pandas pytz
 
       - name: Run price tracker script
         run: python stock_tracker.py
