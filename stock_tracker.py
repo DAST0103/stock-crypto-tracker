@@ -5,7 +5,7 @@ import requests
 import yfinance as yf
 
 # ---------------------------------------------------------
-# NTFY EINSTELLUNG (dein festes Topic)
+# NTFY EINSTELLUNG
 # ---------------------------------------------------------
 NTFY_TOPIC = "dast0103_kurs_alert"
 NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
@@ -24,12 +24,18 @@ PORTFOLIO = {
 
 
 def send_ntfy_notification(title, message, tags="chart_with_upwards_trend"):
-    """Sendet eine Push-Nachricht über ntfy.sh"""
+    """Sendet eine Push-Nachricht über ntfy.sh (UTF-8 geschützt)"""
     try:
+        # Header-Werte für ntfy sicher in UTF-8 kodieren
+        headers = {
+            "Title": title.encode("utf-8").decode("latin-1"),
+            "Tags": tags.encode("utf-8").decode("latin-1"),
+        }
+
         response = requests.post(
             NTFY_URL,
             data=message.encode("utf-8"),
-            headers={"Title": title, "Tags": tags},
+            headers=headers,
             timeout=10,
         )
         if response.status_code == 200:
@@ -54,7 +60,7 @@ def main():
     tz = pytz.timezone("Europe/Zurich")
     now = datetime.now(tz)
 
-    # Zeitfenster von 12:20 bis 13:30 Uhr für den 12:30-Uhr-Bericht
+    # Zeitfenster für den 12:30 Uhr Tagesbericht (12:20 bis 13:30 Uhr)
     is_daily_report = (now.hour == 12 and now.minute >= 20) or (
         now.hour == 13 and now.minute <= 30
     )
@@ -81,13 +87,13 @@ def main():
             f" -> [{name}] Kurs: {current_price:.2f} {curr} | Kauf: {buy_price:.2f} {curr} | Diff: {diff:+.2f} {curr}"
         )
 
-        # 1. Gewinnschwelle ab +4.00
+        # 1. Bedingung: Gewinn >= +4.00 Einheiten
         if diff >= 4.0:
             alert_messages.append(
                 f"🚨 [{name}] Aktuell: {current_price:.2f} {curr} | Gewinn: +{diff:.2f} {curr}"
             )
 
-        # 2. Täglicher Gesamtbericht
+        # 2. Bedingung: Täglicher Bericht
         if is_daily_report:
             sign = "+" if diff >= 0 else ""
             percent = (diff / buy_price) * 100
