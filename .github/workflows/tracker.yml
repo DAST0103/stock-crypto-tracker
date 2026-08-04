@@ -2,9 +2,8 @@ name: Check Prices
 
 on:
   schedule:
-    # Beispiel: Läuft alle 2 Stunden
     - cron: '0 */2 * * *'
-  workflow_dispatch: # Erlaubt das manuelle Starten via GitHub-Oberfläche
+  workflow_dispatch:
 
 jobs:
   check-prices:
@@ -18,7 +17,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.10'
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
