@@ -5,9 +5,9 @@ import requests
 import yfinance as yf
 
 # ---------------------------------------------------------
-# NTFY EINSTELLUNG
+# NTFY EINSTELLUNG (Abonniertes Topic)
 # ---------------------------------------------------------
-NTFY_TOPIC = "meine_finanzen_alerts_202627"
+NTFY_TOPIC = "dast0103_kurs_alert"
 NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
 
 # ---------------------------------------------------------
@@ -26,7 +26,7 @@ PORTFOLIO = {
 def send_ntfy_notification(title, message, tags="chart_with_upwards_trend"):
     """Sendet eine Push-Nachricht über ntfy.sh (UTF-8 geschützt)"""
     try:
-        # Header-Werte für ntfy sicher in UTF-8 kodieren
+        # Header für ntfy sicher in UTF-8 kodieren
         headers = {
             "Title": title.encode("utf-8").decode("latin-1"),
             "Tags": tags.encode("utf-8").decode("latin-1"),
@@ -87,13 +87,13 @@ def main():
             f" -> [{name}] Kurs: {current_price:.2f} {curr} | Kauf: {buy_price:.2f} {curr} | Diff: {diff:+.2f} {curr}"
         )
 
-        # 1. Bedingung: Gewinn >= +4.00 Einheiten
+        # 1. Gewinnschwelle ab +4.00 Einheiten
         if diff >= 4.0:
             alert_messages.append(
                 f"🚨 [{name}] Aktuell: {current_price:.2f} {curr} | Gewinn: +{diff:.2f} {curr}"
             )
 
-        # 2. Bedingung: Täglicher Bericht
+        # 2. Täglicher Gesamtbericht
         if is_daily_report:
             sign = "+" if diff >= 0 else ""
             percent = (diff / buy_price) * 100
