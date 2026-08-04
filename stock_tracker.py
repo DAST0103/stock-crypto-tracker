@@ -1,90 +1,66 @@
-import os
-import requests
+import sys
+from datetime import datetime
+import pytz
 import yfinance as yf
-from datetime import datetime, timedelta
 
-# Topic aus den GitHub Secrets auslesen
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "dein_fallback_topic")
-
-ASSETS = {
-    "Dormakaba": "DOKA.SW",
-    "Kering": "KER.PA",
-    "Beyond Meat": "BYND",
-    "Microsoft": "MSFT",
-    "Ethereum": "ETH-USD",
-    "Chainlink": "LINK-USD"
+# Kaufkurse der Assets
+PORTFOLIO = {
+    "Dormakaba": {"symbol": "DOKA.SW", "buy_price": 70.50, "currency": "CHF"},
+    "Kering": {"symbol": "KER.PA", "buy_price": 340.00, "currency": "EUR"},
+    "Beyond Meat": {"symbol": "BYND", "buy_price": 6.00, "currency": "USD"},
+    "Microsoft": {"symbol": "MSFT", "buy_price": 530.00, "currency": "USD"},
+    "Ethereum": {"symbol": "ETH-USD", "buy_price": 4408.80, "currency": "USD"},
+    "Chainlink": {"symbol": "LINK-USD", "buy_price": 19.671, "currency": "USD"},
 }
 
-def check_assets():
-    print("Starte 2-Stunden-Kursvergleich...")
-    
-    for name, symbol in ASSETS.items():
-        try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="1d", interval="5m")
-            
-            if df.empty or len(df) < 2:
-                print(f"[{name}] Keine ausreichenden Intraday-Daten verfuegbar.")
-                continue
 
-            current_time = df.index[-1]
-            target_time = current_time - timedelta(hours=2)
+def get_current_price(symbol):
+    ticker = yf.Ticker(symbol)
+    # Neuesten Kurs abfragen
+    data = ticker.history(period="1d")
+    if not data.empty:
+        return data["Close"].iloc[-1]
+    return None
 
-            df_past = df[df.index <= target_time]
-            
-            if not df_past.empty:
-                ref_price = df_past['Close'].iloc[-1]
-                time_diff_str = "letzten 2 Std."
-            else:
-                ref_price = df['Close'].iloc[0]
-                time_diff_str = "Start der Handelszeit"
 
-            current_price = df['Close'].iloc[-1]
-            change_percent = ((current_price - ref_price) / ref_price) * 100
-            
-            currency = ticker.info.get('currency', 'USD')
-            if currency == 'USD':
-                currency_symbol = "$"
-            elif currency == 'EUR':
-                currency_symbol = "€"
-            elif currency == 'CHF':
-                currency_symbol = "CHF"
-            else:
-                currency_symbol = currency
+def main():
+    # Aktuelle Zeit in Mitteleuropäischer Zeit (Schweiz/Deutschland)
+    tz = pytz.timezone("Europe/Zurich")
+    now = datetime.now(tz)
 
-            if change_percent >= 0:
-                direction_icon = "🚀"
-                direction_text = "Anstieg"
-                tags = "chart_with_upwards_trend"
-            else:
-                direction_icon = "📉"
-                direction_text = "Rückgang"
-                tags = "chart_with_downwards_trend"
+    # Prüfen, ob es der tägliche Berichtszeitpunkt (12:30 Uhr) ist
+    # GitHub Actions führt den Cron-Job etwa um 12:30 aus
+    is_daily_report = now.hour == 12 and now.minute >= 25 and now.minute <= 35
 
-            title = f"{direction_icon} {name}: {change_percent:+.2f}% (2h)"
-            message = (
-                f"{name} ({direction_text})\n"
-                f"Aktueller Kurs: {current_price:.2f} {currency_symbol}\n"
-                f"Kurs vor {time_diff_str}: {ref_price:.2f} {currency_symbol}\n"
-                f"Veränderung: {change_percent:+.2f}%"
+    print(f"--- Modus: {'Täglicher Statusbericht (12:30 Uhr)' if is_daily_report else '2-Stunden-Gevinnprüfung'} ---")
+
+    for name, info in PORTFOLIO.items():
+        current_price = get_current_price(info["symbol"])
+
+        if current_price is None:
+            print(f"Fehler beim Abrufen von {name}")
+            continue
+
+        buy_price = info["buy_price"]
+        diff = current_price - buy_price
+        curr = info["currency"]
+
+        # 1. Bedingung: Gewinn von mindestens +4 Einheiten erreicht
+        if diff >= 4.0:
+            print(
+                f"🚨 GEWINN-ALERT! [{name}] Aktuell: {current_price:.2f} {curr} | "
+                f"Kaufkurs: {buy_price:.2f} {curr} | Gewinn: +{diff:.2f} {curr}"
             )
-            
-            # ntfy Push-Nachricht senden (UTF-8 encodiert)
-            response = requests.post(
-                f"https://ntfy.sh/{NTFY_TOPIC}",
-                data=message.encode('utf-8'),
-                headers={
-                    "Title": title.encode('utf-8'),
-                    "Priority": "default",
-                    "Tags": tags
-                }
-            )
-            
-            # Konsolenausgabe ohne Emojis, um Encoding-Fehler in den Logs 100% zu vermeiden
-            print(f" -> [{name}] Kurs: {current_price:.2f} {currency_symbol} | {change_percent:+.2f}% (Status Code: {response.status_code})")
 
-        except Exception as e:
-            print(f"Fehler bei {name} ({symbol}): {e}")
+        # 2. Bedingung: Täglicher Bericht um 12:30 Uhr
+        if is_daily_report:
+            sign = "+" if diff >= 0 else ""
+            percent = (diff / buy_price) * 100
+            print(
+                f"📊 [{name}] Aktuell: {current_price:.2f} {curr} | "
+                f"Abweichung: {sign}{diff:.2f} {curr} ({sign}{percent:.2f}%)"
+            )
+
 
 if __name__ == "__main__":
-    check_assets()
+    main()
