@@ -7,7 +7,7 @@ import yfinance as yf
 # ---------------------------------------------------------
 # NTFY EINSTELLUNG
 # ---------------------------------------------------------
-NTFY_TOPIC = "dast0103_kurs_alert"
+NTFY_TOPIC = "meine_finanzen_alerts_202627"
 NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
 
 # ---------------------------------------------------------
